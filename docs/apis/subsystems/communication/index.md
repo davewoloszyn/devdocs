@@ -18,6 +18,9 @@ executed in the background. Communication API has multiple interfaces which acts
 ad-hoc tasks. These tasks are responsible to action the requested feature from the provider plugin (such as Matrix) informed by the Communication API instance. For developers
 to interact with the API, they must use the public API (communication\api).
 
+Communication API takes advantage of the latest [Hooks API](../../plugintypes/communication/index.md). This means all the actions in core have its own hook dispatched and
+the registered callback for the hooks are used to interact with the hook listener in communication api (`communication\hook_listener`).
+
 Communication API allows to add ad-hoc tasks to the queue to perform actions on the communication providers. This API will not allow any immediate actions to be performed on the
 communication providers. It will only add the tasks to the queue. The exception has been made for deletion of members in case of deleting the user. This is because the user will
 not be available for any checks (capability, role etc.) after deleted.
@@ -149,6 +152,33 @@ This is destructive and might remove all the messages and other data associated 
 
 :::
 
+### Create and configure a room according to the provider
+
+There are cases where the provider is changed for a communication instance, for example, previously the provider was matrix and now it is changed to slack. In this case, the room
+and its members need to be configured according to the new provider. The method is `$communication->create_and_configure_room()` takes care of this without having to write extra
+bit of logics. For example, if the provider is changed from matrix to slack, the method will delete the room from matrix and create a new room in slack and add the members to
+the room and remove all members from matrix.
+
+```php
+// First initialize the instance.
+$communication = \core_communication\api::load_by_instance(
+            context: $context,
+            component: 'core_course',
+            instancetype: 'coursecommunication',
+            instanceid: $course->id,
+            provider: 'communication_matrix',
+        );
+
+// Now call this with the new provider to take care of the room and its members for the new provider.
+$communication->configure_room_and_membership_by_provider(
+                provider: 'communication_slack',
+                instance: $course,
+                communicationroomname: $coursecommunicationroomname,
+                users: $enrolledusers,
+                instanceimage: $courseimage,
+            );
+```
+
 ### Add members to a room
 
 `$communication->add_members_to_room()` method is used to add an ad-hoc to add members to a room in the communication provider. The user id of each user to be added to
@@ -208,6 +238,10 @@ public function remove_members_from_room(
 ```
 
 This method accepts the same parameters as the `add_members_to_room()` method and the usage is also the same.
+
+It's also possible to remove all members from a room by using `$communication->remove_all_members_from_room()` which does not take any parameters but will remove all users from
+the room and also delete the user mapping from the `communication_user` table. Please be aware, both of these will remove users and might delete communication history from the
+provider itself.
 
 ### Show the communication room creation status notification
 
