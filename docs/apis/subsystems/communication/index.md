@@ -18,9 +18,6 @@ executed in the background. Communication API has multiple interfaces which acts
 ad-hoc tasks. These tasks are responsible to action the requested feature from the provider plugin (such as Matrix) informed by the Communication API instance. For developers
 to interact with the API, they must use the public API (communication\api).
 
-Communication API takes advantage of the latest [Hooks API](../../plugintypes/communication/index.md). This means all the actions in core have its own hook dispatched and
-the registered callback for the hooks are used to interact with the hook listener in communication api (`communication\hook_listener`).
-
 Communication API allows to add ad-hoc tasks to the queue to perform actions on the communication providers. This API will not allow any immediate actions to be performed on the
 communication providers. It will only add the tasks to the queue. The exception has been made for deletion of members in case of deleting the user. This is because the user will
 not be available for any checks (capability, role etc.) after deleted.
@@ -34,6 +31,14 @@ Please follow the steps to enable the feature.
 2. Tick the checkbox to enable the following feature: Enable communication providers (`enablecommunicationsubsystem`).
 
 :::
+
+## Hooks
+
+The Communication API takes advantage of the [Hooks API](../../plugintypes/communication/index.md) with actions performed in the following way:
+
+1. Actions in core have their own hook dispatched (e.g. enrol, change role, add to group).
+2. Hooks are then registered to a particular callback (`lib/db/hooks.php`).
+3. Callbacks are then listened for inside the Communication API's hook listener (`communication\hook_listener`) where all the logic is performed.
 
 ## Important features of the API
 
@@ -154,10 +159,12 @@ This is destructive and might remove all the messages and other data associated 
 
 ### Create and configure a room according to the provider
 
-There are cases where the provider is changed for a communication instance, for example, previously the provider was matrix and now it is changed to slack. In this case, the room
-and its members need to be configured according to the new provider. The method is `$communication->create_and_configure_room()` takes care of this without having to write extra
-bit of logics. For example, if the provider is changed from matrix to slack, the method will delete the room from matrix and create a new room in slack and add the members to
-the room and remove all members from matrix.
+There are cases where the provider is changed for a communication instance. For example, previously the provider was set to _Provider A_ and now it has changed to _Provider B_. In this case, the room and its members need to be configured according to the new provider. Without any extra logic needed, the method `$communication->configure_room_and_membership_by_provider()` takes care of this in the following way:
+
+1. Communication provider is changed from _Provider A_ to _Provider B_.
+2. New room is created in _Provider A_.
+3. Members are added to the new room at _Provider A_.
+4. Members are removed from the old room at _Provider B_.
 
 ```php
 // First initialize the instance.
@@ -239,9 +246,13 @@ public function remove_members_from_room(
 
 This method accepts the same parameters as the `add_members_to_room()` method and the usage is also the same.
 
-It's also possible to remove all members from a room by using `$communication->remove_all_members_from_room()` which does not take any parameters but will remove all users from
-the room and also delete the user mapping from the `communication_user` table. Please be aware, both of these will remove users and might delete communication history from the
-provider itself.
+It's also possible to remove all members from a room by using `$communication->remove_all_members_from_room()`. This method does not take any parameters and will remove all users from the room and delete the user mapping found in the `communication_user` table.
+
+:::caution
+
+Both `$communication->remove_all_members_from_room()` and `$communication->remove_members_from_room()` will remove users and may delete communication history from the provider itself.
+
+:::
 
 ### Show the communication room creation status notification
 
