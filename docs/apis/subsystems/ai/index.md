@@ -15,7 +15,7 @@ As well as providing a straightforward way to integrate with various AI provider
 
 ## What is AI in this context?
 
-When we talk about AI in the context of this subsystem, AI is: anything that's plugged in via a Provider
+When we talk about AI in the context of this subsystem, AI is anything that's plugged in via a Provider
 Plugin and provides one or more Actions.
 
 Artificial Intelligence (AI), Machine Learning (ML), Large Language Models (LLMs), Generative AI, etc.
@@ -24,13 +24,32 @@ the subsystem everything is just called AI.
 
 ## Design Overview
 
+```mermaid
+flowchart TD
+    Placement["Placement"]:::placementStyle
+    Action["Action"]:::actionStyle
+    SubsystemManager["Subsystem Manager"]:::managerStyle
+    Provider["Provider"]:::providerStyle
+
+    Placement --> |"Instantiates Action"| Action
+    Action --> |"Passes to Subsystem Manager"| SubsystemManager
+    SubsystemManager --> |"Selects & Invokes Provider"| Provider
+    Provider --> |"Returns Response to Action"| Action
+
+    %% Define styles for each block
+    classDef placementStyle fill:#FFDDC1,stroke:#FF6F61,stroke-width:2px;
+    classDef actionStyle fill:#C1E1C1,stroke:#4CAF50,stroke-width:2px;
+    classDef managerStyle fill:#C1DFF0,stroke:#2196F3,stroke-width:2px;
+    classDef providerStyle fill:#FFD700,stroke:#FFC107,stroke-width:2px;
+```
+
 The AI subsystem consists of the following (main) components:
 
 - **Placements**
   - Are the UI components and associated workflows that allow users to interact with AI.
   - They implement one or more AI actions.
-  - They provide a consistent experience for users regardless of which AI is providing the action
-  - They are LMS plugins
+  - They provide a consistent experience for users regardless of which AI is providing the action.
+  - They are LMS plugins.
 - **Actions**
   - These are the "things" users can do with AI.
   - Examples of an action include: generating text, generating an image, providing a chat interface.
@@ -38,12 +57,12 @@ The AI subsystem consists of the following (main) components:
 - **Providers**
   - Providers are the interface between AI systems and the Moodle LMS.
   - They implement support for one or more actions.
-  - Providers should not have an UI, apart from those required for settings,
+  - Providers should not have a UI, apart from those required for settings,
   to configure and manage the provider. For example an Administration UI to allow setting of API
   keys; and/or to enable or disable the enabled actions.
   - The aim of Providers is to make it "easy" to integrate AI systems with LMS,
   without the need to implement a UI to use them.
-  - They are LMS plugins
+  - They are LMS plugins.
 - **Subsystem Manager**
   - This is implemented at code level and is a core part of the subsystem design.
   - It is the "controller" that sits between Placements and Providers.
@@ -119,19 +138,32 @@ Users only need to accept the policy once.
 
 To assist Placements with policy display and acceptance the Manager provides the following functionality:
 
-- The Manager makes the following methods available for Placements to call directly:
-  - `\core_ai\manger::get_user_policy(int $userid): bool` -
-  Given a user ID (record id in user table), returns true if the user has accepted the policy,
-  false otherwise. It handles looking up the status and caching the response.
-  - `\core_ai\manager::set_user_policy(int $userid, int $contextid): bool` -
-  Given a user ID and a Context ID (of the context the policy was displayed in) set the policy
-  acceptance.
-- The manager class also makes available webservices to be used for policy setting and getting.
-  This helps Placements set policy acceptance via ajax as part of a UI workflow:
-  - `core_ai_get_policy_status` -
-  Gets the policy status for a user. Calls: `core_ai\external\get_policy_status`
-  - `core_ai_set_policy_status` -
-  Sets the policy status for a user. Calls: `core_ai\external\set_policy_status`
+#### Direct call
+
+The Manager makes the following methods available for Placements to call directly:
+
+##### `\core_ai\manager::get_user_policy_status(int $userid): bool`
+
+Given a user ID (record id in user table), returns true if the user has accepted the policy,
+false otherwise. It handles looking up the status and caching the response.
+
+##### `\core_ai\manager::user_policy_accepted(int $userid, int $contextid): bool`
+
+Given a user ID and a Context ID (of the context the policy was displayed in) set the policy
+acceptance.
+
+#### Webservices
+
+The manager class also makes available webservices to be used for policy setting and getting.
+This helps Placements set policy acceptance via ajax as part of a UI workflow:
+
+##### `core_ai_get_policy_status`
+
+Gets the policy status for a user. Calls: `core_ai\external\get_policy_status`
+
+##### `core_ai_set_policy_status`
+
+Sets the policy status for a user. Calls: `core_ai\external\set_policy_status`
 
 ### Actions
 
@@ -142,17 +174,19 @@ Actions are defined as classes in the `\core_ai\aiactions` namespace.
 The naming convention for Action classes is `<verb>_<noun singular>`,
 for example: `generate_image`, `translate_text`.
 
-Each action **MUST** inherit from the `\core_ai\aiactions\base()` abstract class.
+#### Base abstract class
+
+Each action **MUST** inherit from the `\core_ai\aiactions\base` abstract class.
 They must also implement two methods:
 
-- `__construct(...args): void`
-  - The constructor method is allowed to have a variable signature, so that each action can define its own
-  configuration requirements.
-  - The method **MUST** take a `contextid` as one of the variables.
-  - An Action **MUST** be correctly instantiated before it can be used and passed onto the AI manager.
-  For example the constructor method for the generate_image Action is:
+##### 1. `__construct()`
 
-```php
+- The constructor method is allowed to have a variable signature, so that each action can define its own
+configuration requirements.
+- The method **MUST** take a `contextid` as one of the variables.
+- An Action **MUST** be correctly instantiated before it can be used and passed onto the AI manager.
+
+```php title="Example: The __construct() method for the generate_image Action"
 public function __construct(
     int $contextid,
     /** @var int The user id requesting the action. */
@@ -172,14 +206,14 @@ public function __construct(
 }
 ```
 
-- `store(response_base $response): int`
-  - This method is responsible for storing any action specific data related to the action in the
-  LMS database.
-  - Each Action must store its own data can that can be referenced later.
-  - It takes a matching response class, that contains the result of the action call.
-  - For example the store() call form the generate_image Action is:
+##### 2. `store()`
 
-```php
+- This method is responsible for storing any action specific data related to the action in the
+LMS database.
+- Each Action must store its own data can that can be referenced later.
+- It takes a matching response class, that contains the result of the action call.
+
+```php title="Example: The store() method for the generate_image Action"
 #[\Override]
 public function store(response_base $response): int {
     global $DB;
@@ -200,13 +234,13 @@ public function store(response_base $response): int {
 ```
 
 It is up to the action to define its own database schema and stored data, that is relevant to
-what the action does. For example the database table definition for the generate_image Action is:
+what the action does.
 
-```xml
-<TABLE NAME="ai_action_generate_image" COMMENT="stores specific data about generate image actions">
+```xml title="Example: The database table definition for the generate_image Action"
+<TABLE NAME="ai_action_generate_image" COMMENT="Stores specific data about generate image actions">
     <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
-        <FIELD NAME="prompt" TYPE="text" NOTNULL="true" SEQUENCE="false" COMMENT="The text from the user that was used to generate the image"/>
+        <FIELD NAME="prompt" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="The text from the user that was used to generate the image"/>
         <FIELD NAME="numberimages" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="The number of images requested to be generated"/>
         <FIELD NAME="quality" TYPE="char" LENGTH="21" NOTNULL="true" SEQUENCE="false" COMMENT="The quality of the image, e.g. hd."/>
         <FIELD NAME="aspectratio" TYPE="char" LENGTH="20" NOTNULL="false" SEQUENCE="false" COMMENT="The aspect ratio of the generate image, e.g landscape"/>
@@ -230,18 +264,15 @@ This allows Placements to receive an expected response for any Action call.
 Each Action has a matching response class. The provider that processes the Action will instantiate
 an instance of this response class and populate it with the data required for this type of response.
 
-Each Action response MUST inherit from the `\core_ai\aiactions\responses\response_base` abstract
+Each Action response **MUST** inherit from the `\core_ai\aiactions\responses\response_base` abstract
 class. They must also implement two methods:
 
-- `set_response(array $response): void`
-  - Taking an array of response variables (which must be defined as class variables),
-  it sets these against class variables so they can be retrieved by the Manager and calling Placement.
-- `get_response(): array`
-  - Returns the set response data.
+##### 1. `set_response_data()`
 
-For example the `set_response()` for the generate_image Action response is:
+Taking an array of response variables (which must be defined as class variables),
+it sets these against class variables so they can be retrieved by the Manager and calling Placement.
 
-```php
+```php title="Example: The set_response_data() for the generate_image Action response"
     #[\Override]
     public function set_response_data(array $response): void {
         $this->draftfile = $response['draftfile'] ?? null;
@@ -250,9 +281,11 @@ For example the `set_response()` for the generate_image Action response is:
     }
 ```
 
-And the `get_response()` for the generate_image Action response is:
+##### 2. `get_response_data()`
 
-```php
+Returns the set response data.
+
+```php title="Example: The get_response_data() for the generate_image Action response"
     #[\Override]
     public function get_response_data(): array {
         return [
