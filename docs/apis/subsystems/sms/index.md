@@ -1,10 +1,24 @@
 ---
 title: SMS API
+tags:
+    - SMS
 ---
 
 <Since version="4.5" issueNumber="MDL-79808" />
 
-The SMS API lets you send SMS messages using configured gateways, fetch messages that were previously sent, and check on their status.
+The SMS API allows developers to implement SMS-related features into their plugins.
+The subsystem contains an SMS Manager class `\core_sms\manager` which facilitates the actions performed by the API.
+
+Some of the actions made possible are:
+
+- Sending messages
+- Fetching messages
+- Checking the status of a message
+- Getting SMS gateways.
+
+Currently, the design of the SMS API features the following plugin types:
+
+- [SMS gateway](/apis/plugintypes/sms/index.md)
 
 ## Sending an SMS
 
@@ -26,7 +40,7 @@ $message = \core\di::get(\core_sms\manager::class)
 
 :::info Message lengths
 
-A single SMS sent by the API may consist of up to 480 UTF-8 characters. It is up to the message _gateway_ plugin to determine how this message is sent to the recipient.
+A single SMS sent by the API may consist of up to 480 UTF-8 characters. It is up to the message _gateway plugin_ to determine how this message is sent to the recipient.
 
 Any message longer than the maximum length will be immediately rejected.
 
@@ -124,32 +138,32 @@ graph TD
     end
 ```
 
-## Getting the list of SMS gateways
+## Getting SMS gateways
 
-Once the gateway is configured from UI, any component implementing the core_sms API can get the list of gateways. The list can also be filtered.
+[SMS gateways](/apis/plugintypes/sms/index.md) are plugins that provide a way to interface with external SMS providers.
+Once a gateway is configured, any component implementing the SMS API can get a list of gateways.
 
 ```php title="Getting the list of enabled gateways"
 $manager = \core\di::get(\core_sms\manager::class);
 $gatewayrecords = $manager->get_gateway_records();
 
-// It is also possible to filter the requst.
+// It is also possible to filter the request.
 $gatewayrecords = $manager->get_gateway_records(['id' => $id]);
 
 // To get all the enabled gateway instances.
 $gatewayrecords = $manager->get_enabled_gateway_instances();
 ```
 
-## Some important hooks to be aware of
+## Important hooks
 
-SMS API dispatches some hooks which should be assessed and used when this API is implemented in a plugin/component. These hooks helps with
-managing the data, like save them from deletion or accidental deactivation from the SMS Gateway management UI while a specific gateway is
-being used by a component.
+The SMS API dispatches some [hooks](/apis/core/hooks/index.md) which should be considered when implemented by a plugin/component.
 
-### before_gateway_deleted & before_gateway_disabled
+- before_gateway_deleted
+- before_gateway_disabled
 
-Before deleting or disabling an SMS gateway, these two hooks are dispatched from the core_sms API to allow the components using that specific
-gateway to stop that action or do necessary cleanup. It is important to listed to these hooks to prevent data loss or potential issues with a
-gateway being used which is deleted or disabled by accident.
+Before deleting or disabling an [SMS gateways](/apis/plugintypes/sms/index.md), these two hooks are dispatched from the SMS API.
+This allows components that are actively using that gateway to stop the action, or do necessary cleanup.
+Listening to these hooks is crucial to avoid data loss or accidental deletion when disabling an active gateway.
 
 ```php title="Implement the hooks to check for usage before deletion or deactivation"
 
